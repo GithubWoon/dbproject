@@ -89,6 +89,13 @@ public class Main {
     private static void addProduct() {
         System.out.print("상품 코드: ");
         String productCode = scanner.nextLine();
+
+        // 중복된 상품 코드가 이미 존재하는지 확인
+        if (products.containsKey(productCode)) {
+            System.out.println("이미 존재하는 상품 코드입니다. 다른 코드를 입력하세요.");
+            return; // 중복된 경우 메서드를 종료
+        }
+
         System.out.print("상품명: ");
         String productName = scanner.nextLine();
         System.out.print("재고 수량: ");
@@ -101,6 +108,7 @@ public class Main {
         // products 맵에도 상품 정보 추가
         products.put(productCode, initialQuantity);
     }
+
 
     // 사용자 메뉴
     private static void userMenu() {
@@ -153,22 +161,52 @@ public class Main {
     }
 
     // 데이터 저장
-    private static void saveProductData() {
-        try (Connection connection = getConnection();
-             PreparedStatement preparedStatement = connection.prepareStatement("DELETE FROM productinfo");
-        ) {
-            preparedStatement.executeUpdate();
-
-            for (Map.Entry<String, Integer> entry : products.entrySet()) {
-                String productNumber = entry.getKey();
-                int quantity = entry.getValue();
-                insertProductToDatabase(productNumber, "", quantity);
-            }
-        } catch (SQLException e) {
-            System.out.println("데이터를 저장하는 중 오류가 발생했습니다.");
-            e.printStackTrace();
+private static void saveProductData() {
+    try (Connection connection = getConnection()) {
+        for (Map.Entry<String, Integer> entry : products.entrySet()) {
+            String productNumber = entry.getKey();
+            int quantity = entry.getValue();
+            String productName = getProductNameFromDatabase(productNumber); // 상품명 가져오기
+            updateProductInDatabase(productNumber, productName, quantity, connection);
         }
+    } catch (SQLException e) {
+        System.out.println("데이터를 저장하는 중 오류가 발생했습니다.");
+        e.printStackTrace();
     }
+}
+
+// 데이터베이스에서 상품명을 가져오는 메서드
+private static String getProductNameFromDatabase(String productNumber) {
+    String productName = null;
+    try (Connection connection = getConnection();
+         PreparedStatement preparedStatement = connection.prepareStatement("SELECT PRODUCTNAME FROM productinfo WHERE PRODUCTNUMBER = ?");
+    ) {
+        preparedStatement.setString(1, productNumber);
+        ResultSet resultSet = preparedStatement.executeQuery();
+
+        if (resultSet.next()) {
+            productName = resultSet.getString("PRODUCTNAME");
+        }
+    } catch (SQLException e) {
+        System.out.println("데이터베이스에서 상품명을 가져오는 중 오류가 발생했습니다.");
+        e.printStackTrace();
+    }
+    return productName;
+}
+
+// 데이터베이스에서 기존 상품 정보를 업데이트하는 메서드
+private static void updateProductInDatabase(String productNumber, String productName, int quantity, Connection connection) {
+    try (PreparedStatement preparedStatement = connection.prepareStatement(
+            "UPDATE productinfo SET PRODUCTNAME = ?, QUANTITY = ? WHERE PRODUCTNUMBER = ?")) {
+        preparedStatement.setString(1, productName);
+        preparedStatement.setInt(2, quantity);
+        preparedStatement.setString(3, productNumber);
+        preparedStatement.executeUpdate();
+    } catch (SQLException e) {
+        System.out.println("데이터베이스에서 상품 정보를 업데이트하는 중 오류가 발생했습니다.");
+        e.printStackTrace();
+    }
+}
 
     public static void main(String[] args) {
         loadProductData(); // 프로그램 시작 시 데이터를 데이터베이스에서 로드
