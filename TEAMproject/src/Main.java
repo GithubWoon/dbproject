@@ -1,10 +1,10 @@
 import java.sql.Connection;
 import java.sql.DriverManager;
-import java.sql.PreparedStatement;
+import java.sql.PreparedStatement; // 동적 쿼리를 하기위해 사용되는 클래스
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.HashMap;
-import java.util.Map;
+import java.util.Map; // 키와 값을 저장하는 자료구조
 import java.util.Scanner;
 
 public class Main {
@@ -16,7 +16,7 @@ public class Main {
     private static final String DATABASE_PASSWORD = "projectss1";
 
     public static void main(String[] args) {
-        loadProductData();
+        loadProductData(); // 프로그램 시작 시 데이터를 데이터베이스에서 로드
 
         while (true) {
             System.out.println("로그인 시스템");
@@ -26,7 +26,7 @@ public class Main {
             String password = scanner.nextLine();
 
             if (login(username, password)) {
-                if (username.equals("사용자")) {
+                if (username.equals("사용자") || username.startsWith("userid")) {
                     userMenu();
                 } else if (username.equals("관리자")) {
                     adminMenu();
@@ -83,8 +83,23 @@ public class Main {
         if (response.equals("y")) {
             products.clear();
             System.out.println("상품 정보가 초기화되었습니다.");
+
+            // 상품정보 모두 초기화 메서드
+            deleteAllProductData();
         } else {
             System.out.println("상품 정보 초기화를 취소했습니다.");
+        }
+    }
+
+    // 데이터베이스에서 모든 상품 데이터 삭제
+    private static void deleteAllProductData() {
+        try (Connection connection = getConnection();
+            PreparedStatement preparedStatement = connection.prepareStatement("DELETE FROM productinfo")) {
+            preparedStatement.executeUpdate();
+            System.out.println("데이터베이스의 모든 상품 정보가 삭제되었습니다.");
+        } catch (SQLException e) {
+            System.out.println("데이터베이스에서 상품 정보를 삭제하는 중 오류가 발생했습니다.");
+            e.printStackTrace();
         }
     }
 
@@ -93,18 +108,47 @@ public class Main {
         System.out.println("\n주문 가능한 상품 목록: " + products.keySet());
         System.out.print("주문할 상품: ");
         String productName = scanner.nextLine();
-        System.out.print("수량: ");
-        int quantity = scanner.nextInt();
-        scanner.nextLine();
 
-        if (products.containsKey(productName) && products.get(productName) >= quantity) {
-            int remainingQuantity = products.get(productName) - quantity;
-            products.put(productName, remainingQuantity);
-            System.out.println("주문이 완료되었습니다. 잔여 수량: " + remainingQuantity);
+        // 데이터베이스에서 해당 상품의 재고 수량 조회
+        int availableQuantity = getProductQuantity(productName);
+
+        if (availableQuantity == -1) {
+            System.out.println("주문 가능한 상품이 아닙니다.");
         } else {
-            System.out.println("주문할 수 없거나 재고가 부족합니다.");
+            System.out.println(productName + "의 현재 재고 수량: " + availableQuantity);
+            System.out.print("수량: ");
+            int quantity = scanner.nextInt();
+            scanner.nextLine();
+
+            if (availableQuantity >= quantity) {
+                int remainingQuantity = availableQuantity - quantity;
+                products.put(productName, remainingQuantity);
+                System.out.println("주문이 완료되었습니다. 잔여 수량: " + remainingQuantity);
+            } else {
+                System.out.println("주문할 수량이 재고를 초과합니다.");
+            }
         }
     }
+
+    // 데이터베이스에서 상품의 재고 수량 조회
+    private static int getProductQuantity(String productName) {
+        try (Connection connection = getConnection();
+            PreparedStatement preparedStatement = connection.prepareStatement(
+                    "SELECT QUANTITY FROM productinfo WHERE PRODUCTNAME = ?")) {
+            preparedStatement.setString(1, productName);
+            ResultSet resultSet = preparedStatement.executeQuery();
+            if (resultSet.next()) {
+                return resultSet.getInt("QUANTITY");
+            } else {
+                return -1; // 해당 상품이 존재하지 않음
+            }
+        } catch (SQLException e) {
+            System.out.println("상품 정보를 조회하는 중 오류가 발생했습니다.");
+            e.printStackTrace();
+            return -1;
+        }
+    }
+
 
     // 새로운 상품정보 등록
     private static void addProduct() {
@@ -206,6 +250,18 @@ public class Main {
 
     // 로그인 처리 (이외 사용자는 안됨)
     private static boolean login(String username, String password) {
-        return (username.equals("사용자") || username.equals("관리자")) && password.equals("1");
+        // 사용자 및 관리자 로그인 정보 추가
+        Map<String, String> userLoginInfo = new HashMap<>();
+        userLoginInfo.put("사용자", "pass1");
+        userLoginInfo.put("userid001", "pass1");
+        userLoginInfo.put("userid002", "pass2");
+        userLoginInfo.put("userid003", "pass3");
+        userLoginInfo.put("userid004", "pass4");
+        userLoginInfo.put("userid005", "pass5");
+        Map<String, String> adminLoginInfo = new HashMap<>();
+        adminLoginInfo.put("관리자", "1");
+
+        return (userLoginInfo.containsKey(username) && userLoginInfo.get(username).equals(password)) ||
+               (adminLoginInfo.containsKey(username) && adminLoginInfo.get(username).equals(password));
     }
 }
