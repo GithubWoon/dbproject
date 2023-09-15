@@ -1,15 +1,15 @@
 import java.sql.Connection;
 import java.sql.DriverManager;
-import java.sql.PreparedStatement; // 동적 쿼리를 하기위해 사용되는 클래스
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.HashMap;
-import java.util.Map; // 키와 값을 저장하는 자료구조
+import java.util.Map;
 import java.util.Scanner;
 
 public class Main {
     private static Map<String, Integer> products = new HashMap<>();
-    private static Scanner scanner = new Scanner(System.in);
+    private static Scanner scanner = new Scanner(System.in); // Scanner 객체를 생성
 
     private static final String DATABASE_URL = "jdbc:oracle:thin:@192.168.0.86:1521:xe";
     private static final String DATABASE_USERNAME = "projectss";
@@ -21,9 +21,9 @@ public class Main {
         while (true) {
             System.out.println("로그인 시스템");
             System.out.print("아이디: ");
-            String username = scanner.nextLine();
+            String username = scanner.nextLine(); // 사용자로부터 아이디 입력
             System.out.print("비밀번호: ");
-            String password = scanner.nextLine();
+            String password = scanner.nextLine(); // 사용자로부터 비밀번호 입력
 
             if (login(username, password)) {
                 if (username.equals("사용자") || username.startsWith("userid")) {
@@ -42,7 +42,7 @@ public class Main {
         return DriverManager.getConnection(DATABASE_URL, DATABASE_USERNAME, DATABASE_PASSWORD);
     }
 
-    // 상품정보 데이터베이스에 등록
+    // 상품 정보 데이터베이스에 등록
     private static void insertProduct(String productNumber, String productName, int quantity) {
         try (Connection connection = getConnection();
              PreparedStatement preparedStatement = connection.prepareStatement(
@@ -57,15 +57,26 @@ public class Main {
             e.printStackTrace();
         }
     }
+    
+ // 전체 상품의 재고 조회
+    private static void displayAllProductQuantities() {
+        System.out.println("\n전체 상품 재고 조회:");
+        for (Map.Entry<String, Integer> entry : products.entrySet()) {
+            String productName = entry.getKey();
+            int quantity = entry.getValue();
+            System.out.println(productName + ": " + quantity);
+        }
+    }
+    
 
-    // 데이터베이스에서 주문가능한 상품 불러오기
+    // 데이터베이스에서 주문 가능한 상품 불러오기
     private static void loadProductData() {
         try (Connection connection = getConnection();
              PreparedStatement preparedStatement = connection.prepareStatement("SELECT * FROM productinfo");
              ResultSet resultSet = preparedStatement.executeQuery()) {
 
             while (resultSet.next()) {
-                String productName = resultSet.getString("PRODUCTName");
+                String productName = resultSet.getString("PRODUCTNAME");
                 int quantity = resultSet.getInt("QUANTITY");
                 products.put(productName, quantity);
             }
@@ -75,7 +86,7 @@ public class Main {
         }
     }
 
-    // 상품정보 초기화
+    // 상품 정보 초기화
     private static void resetProductData() {
         System.out.print("상품 정보를 초기화하시겠습니까? (y/n): ");
         String response = scanner.nextLine().trim().toLowerCase();
@@ -84,7 +95,7 @@ public class Main {
             products.clear();
             System.out.println("상품 정보가 초기화되었습니다.");
 
-            // 상품정보 모두 초기화 메서드
+            // 상품 정보를 데이터베이스에서 모두 삭제하는 메서드 호출
             deleteAllProductData();
         } else {
             System.out.println("상품 정보 초기화를 취소했습니다.");
@@ -103,7 +114,7 @@ public class Main {
         }
     }
 
-    // 상품주문
+    // 상품 주문
     private static void orderProduct() {
         System.out.println("\n주문 가능한 상품 목록: " + products.keySet());
         System.out.print("주문할 상품: ");
@@ -123,6 +134,10 @@ public class Main {
             if (availableQuantity >= quantity) {
                 int remainingQuantity = availableQuantity - quantity;
                 products.put(productName, remainingQuantity);
+
+                // 주문이 완료되었으므로 데이터베이스에 반영
+                updateProduct(productName, remainingQuantity);
+
                 System.out.println("주문이 완료되었습니다. 잔여 수량: " + remainingQuantity);
             } else {
                 System.out.println("주문할 수량이 재고를 초과합니다.");
@@ -149,8 +164,7 @@ public class Main {
         }
     }
 
-
-    // 새로운 상품정보 등록
+    // 새로운 상품 정보 등록
     private static void addProduct() {
         System.out.print("상품 코드: ");
         String productCode = scanner.nextLine();
@@ -185,7 +199,8 @@ public class Main {
                     orderProduct();
                     break;
                 case 2:
-                    saveProductData();
+                    saveProductData(); // 상품 정보 저장
+                    System.out.println("주문을 종료합니다.");
                     System.exit(0);
                 default:
                     System.out.println("올바른 옵션을 선택하세요.");
@@ -193,13 +208,14 @@ public class Main {
         }
     }
 
-    // 관리자 메뉴
+ // 관리자 메뉴
     private static void adminMenu() {
         while (true) {
             System.out.println("\n관리자 메뉴");
             System.out.println("1. 상품 정보 등록");
             System.out.println("2. 초기화");
-            System.out.println("3. 종료");
+            System.out.println("3. 전체 재고 조회");
+            System.out.println("4. 종료");
             System.out.print("선택: ");
             int choice = scanner.nextInt();
             scanner.nextLine();
@@ -212,7 +228,10 @@ public class Main {
                     resetProductData();
                     break;
                 case 3:
-                    saveProductData();
+                    displayAllProductQuantities();
+                    break;
+                case 4:
+                    saveProductData(); // 상품 정보 저장
                     System.exit(0);
                 default:
                     System.out.println("올바른 옵션을 선택하세요.");
@@ -226,7 +245,7 @@ public class Main {
             for (Map.Entry<String, Integer> entry : products.entrySet()) {
                 String productName = entry.getKey();
                 int quantity = entry.getValue();
-                updateProduct(productName, quantity, connection);
+                updateProduct(productName, quantity);
             }
         } catch (SQLException e) {
             System.out.println("데이터를 저장하는 중 오류가 발생했습니다.");
@@ -234,10 +253,11 @@ public class Main {
         }
     }
     
-    // 상품정보 업데이트 (상품정보 등록한 후 종료할때 null 값으로 등록되는거 방지)
-    private static void updateProduct(String productName, int quantity, Connection connection) {
-        try (PreparedStatement preparedStatement = connection.prepareStatement(
-                "UPDATE productinfo SET QUANTITY = ? WHERE PRODUCTNAME = ?")) {
+    // 상품 정보 업데이트 (상품 정보 등록 후 종료할 때 null 값으로 등록되는 것을 방지)
+    private static void updateProduct(String productName, int quantity) {
+        try (Connection connection = getConnection();
+             PreparedStatement preparedStatement = connection.prepareStatement(
+                     "UPDATE productinfo SET QUANTITY = ? WHERE PRODUCTNAME = ?")) {
             preparedStatement.setInt(1, quantity);
             preparedStatement.setString(2, productName);
             preparedStatement.executeUpdate();
@@ -246,9 +266,8 @@ public class Main {
             e.printStackTrace();
         }
     }
-    
 
-    // 로그인 처리 (이외 사용자는 안됨)
+    // 로그인 처리 (사용자 및 관리자만 허용)
     private static boolean login(String username, String password) {
         // 사용자 및 관리자 로그인 정보 추가
         Map<String, String> userLoginInfo = new HashMap<>();
